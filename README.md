@@ -46,10 +46,10 @@ docker-compose up
 curl http://localhost:8080/health
 ```
 
-##API
+## API
 OpenAPI спецификация находится в openapi.yaml.
 
-##Эндпоинты:
+## Эндпоинты:
 - POST /team/add — создать команду с участниками
 - GET /team/get?team_name=xxx — получить команду
 - POST /users/setIsActive — изменить активность пользователя
