@@ -1,0 +1,49 @@
+include .env
+
+.PHONY: run
+run:
+	go run cmd/app/main.go
+
+.PHONY: build
+build:
+	go build -o ./bin/app cmd/app/main.go
+
+.PHONY: test
+test:
+	go test -v -cover -race ./internal/...
+
+.PHONY: integration-test
+integration-test:
+	go clean -testcache && go test -v ./integration-test/...
+
+.PHONY: docker-up
+docker-up:
+	docker-compose up --build -d
+
+.PHONY: docker-down
+docker-down:
+	docker-compose down
+
+.PHONY: docker-logs
+docker-logs:
+	docker-compose logs -f app
+
+.PHONY: migrate-up
+migrate-up:
+	migrate -path migrations -database "$(PG_URL)" up
+
+.PHONY: migrate-down
+migrate-down:
+	migrate -path migrations -database "$(PG_URL)" down
+
+.PHONY: lint
+lint:
+	golangci-lint run
+
+.PHONY: fmt
+fmt:
+	go fmt ./...
+
+.PHONY: tidy
+tidy:
+	go mod tidy

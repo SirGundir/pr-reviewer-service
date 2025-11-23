@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: pr_reviewer_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pr_reviewer
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pr_reviewer_network
+
+  # Service for automatically applying migrations
+  migrate:
+    image: migrate/migrate:v4.17.0
+    container_name: pr_reviewer_migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+    command: 
+      - "-path=/migrations"
+      - "-database=postgres://postgres:postgres@postgres:5432/pr_reviewer?sslmode=disable"
+      - "up"
+    networks:
+      - pr_reviewer_network
+
+  app:
+    build: .
+    container_name: pr_reviewer_app
+    ports:
+      - "8080:8080"
+    environment:
+      PG_URL: "postgres://postgres:postgres@postgres:5432/pr_reviewer?sslmode=disable"
+      HTTP_PORT: "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully  # ← ВАЖНО: ждём завершения миграций
+    networks:
+      - pr_reviewer_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  pr_reviewer_network:
+    driver: bridge

@@ -1,0 +1,13 @@
+app:
+  name: 'pr-reviewer-service'
+  version: '1.0.0'
+
+http:
+  port: '8080'
+
+logger:
+  level: 'info'
+
+postgres:
+  pool_max: 2
+  url: 'postgres://postgres:postgres@localhost:5432/pr_reviewer?sslmode=disable'
