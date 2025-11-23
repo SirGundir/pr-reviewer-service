@@ -9,12 +9,18 @@ build:
 	go build -o ./bin/app cmd/app/main.go
 
 .PHONY: test
-test:
+test
 	go test -v -cover -race ./internal/...
 
 .PHONY: integration-test
 integration-test:
 	go clean -testcache && go test -v ./integration-test/...
+
+.PHONY: test-load
+test-load:
+	@echo "Running load tests..."
+	@chmod +x load_tests/load_test.sh
+	@./load_tests/load_test.sh
 
 .PHONY: docker-up
 docker-up:

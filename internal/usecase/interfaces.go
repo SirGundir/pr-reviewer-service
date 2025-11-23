@@ -17,10 +17,8 @@ func Logger(next http.Handler) http.Handler {
 			statusCode:     http.StatusOK,
 		}
 
-		// Выполняем следующий handler
 		next.ServeHTTP(wrapped, r)
 
-		// Логируем после выполнения
 		duration := time.Since(start)
 		log.Printf(
 			"%s %s %d %s",
@@ -32,7 +30,6 @@ func Logger(next http.Handler) http.Handler {
 	})
 }
 
-// responseWriter оборачивает http.ResponseWriter для захвата status code
 type responseWriter struct {
 	http.ResponseWriter
 	statusCode int
@@ -43,7 +40,6 @@ func (rw *responseWriter) WriteHeader(code int) {
 	rw.ResponseWriter.WriteHeader(code)
 }
 
-// Recovery middleware для обработки panic
 func Recovery(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
@@ -56,14 +52,12 @@ func Recovery(next http.Handler) http.Handler {
 	})
 }
 
-// CORS middleware для разрешения кросс-доменных запросов
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
-		// Обрабатываем preflight запросы
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
 			return
@@ -73,7 +67,6 @@ func CORS(next http.Handler) http.Handler {
 	})
 }
 
-// RequestID middleware добавляет уникальный ID к каждому запросу
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestID := r.Header.Get("X-Request-ID")

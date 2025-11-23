@@ -22,8 +22,7 @@ func (r *UserRepo) Create(ctx context.Context, user entity.User) error {
 		Insert("users").
 		Columns("user_id", "username", "team_name", "is_active", "created_at").
 		Values(user.UserID, user.Username, user.TeamName, user.IsActive, user.CreatedAt).
-		Suffix("ON CONFLICT (user_id) DO UPDATE SET username = ?, team_name = ?, is_active = ?",
-			user.Username, user.TeamName, user.IsActive).
+		Suffix("ON CONFLICT (user_id) DO UPDATE SET username = EXCLUDED.username, team_name = EXCLUDED.team_name, is_active = EXCLUDED.is_active").
 		ToSql()
 
 	if err != nil {

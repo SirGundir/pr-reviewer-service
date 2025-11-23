@@ -57,3 +57,38 @@ func (uc *TeamUseCase) GetTeam(ctx context.Context, teamName string) (entity.Tea
 	}
 	return team, nil
 }
+
+func (uc *TeamUseCase) DeactivateTeamAndReassign(ctx context.Context, teamName string, prRepo repo.PullRequestRepo, selector *ReviewerSelector) error {
+	openPRs, err := prRepo.GetOpenPRsByTeam(ctx, teamName)
+	if err != nil {
+		return fmt.Errorf("TeamUseCase - DeactivateTeamAndReassign - GetOpenPRs: %w", err)
+	}
+
+	if err := uc.userRepo.DeactivateTeam(ctx, teamName); err != nil {
+		return fmt.Errorf("TeamUseCase - DeactivateTeamAndReassign - DeactivateTeam: %w", err)
+	}
+
+	for _, pr := range openPRs {
+		fullPR, err := prRepo.GetByID(ctx, pr.PullRequestID)
+		if err != nil {
+			continue
+		}
+
+		author, err := uc.userRepo.GetByID(ctx, fullPR.AuthorID)
+		if err != nil {
+			continue
+		}
+
+		teamMembers, err := uc.userRepo.GetByTeam(ctx, author.TeamName)
+		if err != nil {
+			continue
+		}
+
+		newReviewers := selector.SelectReviewers(teamMembers, fullPR.AuthorID)
+		fullPR.AssignedReviewers = newReviewers
+
+		prRepo.Update(ctx, fullPR)
+	}
+
+	return nil
+}

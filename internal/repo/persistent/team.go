@@ -71,18 +71,10 @@ func (r *TeamRepo) GetByName(ctx context.Context, teamName string) (entity.Team,
 }
 
 func (r *TeamRepo) Exists(ctx context.Context, teamName string) (bool, error) {
-	sql, args, err := r.Builder.
-		Select("EXISTS(SELECT 1 FROM teams WHERE team_name = ?)").
-		From("teams").
-		Where("team_name = ?", teamName).
-		ToSql()
-
-	if err != nil {
-		return false, fmt.Errorf("TeamRepo - Exists - r.Builder: %w", err)
-	}
+	query := `SELECT EXISTS(SELECT 1 FROM teams WHERE team_name = $1)`
 
 	var exists bool
-	err = r.Pool.QueryRow(ctx, sql, args...).Scan(&exists)
+	err := r.Pool.QueryRow(ctx, query, teamName).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("TeamRepo - Exists - r.Pool.QueryRow: %w", err)
 	}

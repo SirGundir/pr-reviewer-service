@@ -11,13 +11,11 @@ func NewReviewerSelector() *ReviewerSelector {
 	return &ReviewerSelector{}
 }
 
-// SelectReviewers выбирает до 2 случайных активных ревьюверов из команды, исключая автора
 func (rs *ReviewerSelector) SelectReviewers(teamMembers []entity.User, authorID string) []string {
 	candidates := rs.getCandidates(teamMembers, authorID, []string{})
 	return rs.randomPick(candidates, 2)
 }
 
-// FindReplacement находит замену для ревьювера из его команды
 func (rs *ReviewerSelector) FindReplacement(teamMembers []entity.User, authorID string, currentReviewers []string) (string, error) {
 	candidates := rs.getCandidates(teamMembers, authorID, currentReviewers)
 
@@ -59,7 +57,6 @@ func (rs *ReviewerSelector) randomPick(candidates []string, count int) []string 
 		count = len(candidates)
 	}
 
-	// Fisher-Yates shuffle
 	shuffled := make([]string, len(candidates))
 	copy(shuffled, candidates)
 

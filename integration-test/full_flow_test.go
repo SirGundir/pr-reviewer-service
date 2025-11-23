@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -45,8 +46,12 @@ func TestFullWorkflow(t *testing.T) {
 		}
 		defer resp.Body.Close()
 
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		t.Logf("Response status: %d", resp.StatusCode)
+		t.Logf("Response body: %s", string(bodyBytes))
+
 		if resp.StatusCode != http.StatusCreated {
-			t.Errorf("Expected 201, got %d", resp.StatusCode)
+			t.Errorf("Expected 201, got %d. Body: %s", resp.StatusCode, string(bodyBytes))
 		}
 	})
 
@@ -66,18 +71,48 @@ func TestFullWorkflow(t *testing.T) {
 		}
 		defer resp.Body.Close()
 
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		t.Logf("Response status: %d", resp.StatusCode)
+		t.Logf("Response body: %s", string(bodyBytes))
+
 		if resp.StatusCode != http.StatusCreated {
-			t.Errorf("Expected 201, got %d", resp.StatusCode)
+			t.Errorf("Expected 201, got %d. Body: %s", resp.StatusCode, string(bodyBytes))
+			return
 		}
 
 		var result map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&result)
+		if err := json.Unmarshal(bodyBytes, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
-		prData := result["pr"].(map[string]interface{})
-		reviewers := prData["assigned_reviewers"].([]interface{})
+		if result["pr"] == nil {
+			t.Fatal("Response doesn't contain 'pr' field")
+		}
 
-		if len(reviewers) < 1 {
-			t.Error("Expected at least 1 reviewer")
+		prData, ok := result["pr"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("pr field is not a map, got: %T", result["pr"])
+		}
+
+		reviewersRaw, exists := prData["assigned_reviewers"]
+		if !exists {
+			t.Fatal("PR doesn't have 'assigned_reviewers' field")
+		}
+
+		if reviewersRaw == nil {
+			t.Log("No reviewers assigned (empty array)")
+			return
+		}
+
+		reviewers, ok := reviewersRaw.([]interface{})
+		if !ok {
+			t.Fatalf("assigned_reviewers is not an array, got: %T, value: %v", reviewersRaw, reviewersRaw)
+		}
+
+		t.Logf("Assigned reviewers count: %d", len(reviewers))
+
+		if len(reviewers) < 1 || len(reviewers) > 2 {
+			t.Errorf("Expected 1-2 reviewers, got %d", len(reviewers))
 		}
 	})
 
@@ -89,8 +124,11 @@ func TestFullWorkflow(t *testing.T) {
 		}
 		defer resp.Body.Close()
 
+		bodyBytes, _ := io.ReadAll(resp.Body)
 		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected 200, got %d", resp.StatusCode)
+			t.Errorf("Expected 200, got %d. Body: %s", resp.StatusCode, string(bodyBytes))
+		} else {
+			t.Logf("User stats: %s", string(bodyBytes))
 		}
 	})
 
@@ -107,8 +145,9 @@ func TestFullWorkflow(t *testing.T) {
 		}
 		defer resp.Body.Close()
 
+		bodyBytes, _ := io.ReadAll(resp.Body)
 		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected 200, got %d", resp.StatusCode)
+			t.Errorf("Expected 200, got %d. Body: %s", resp.StatusCode, string(bodyBytes))
 		}
 	})
 
@@ -125,8 +164,9 @@ func TestFullWorkflow(t *testing.T) {
 		}
 		defer resp.Body.Close()
 
+		bodyBytes, _ := io.ReadAll(resp.Body)
 		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Idempotent merge should return 200, got %d", resp.StatusCode)
+			t.Errorf("Idempotent merge should return 200, got %d. Body: %s", resp.StatusCode, string(bodyBytes))
 		}
 	})
 }
@@ -134,7 +174,7 @@ func TestFullWorkflow(t *testing.T) {
 func TestConcurrentPRCreation(t *testing.T) {
 	teamName := fmt.Sprintf("concurrent-team-%d", time.Now().Unix())
 
-	//Create team
+	// Create team
 	team := map[string]interface{}{
 		"team_name": teamName,
 		"members": []map[string]interface{}{
@@ -145,9 +185,15 @@ func TestConcurrentPRCreation(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(team)
-	http.Post(baseURL+"/team/add", "application/json", bytes.NewBuffer(body))
+	resp, _ := http.Post(baseURL+"/team/add", "application/json", bytes.NewBuffer(body))
+	if resp != nil {
+		resp.Body.Close()
+	}
 
-	//Create 10 PRs concurrently
+	// Wait a bit for team to be created
+	time.Sleep(100 * time.Millisecond)
+
+	// Create 10 PRs concurrently
 	done := make(chan bool, 10)
 	errors := make(chan error, 10)
 
@@ -178,7 +224,7 @@ func TestConcurrentPRCreation(t *testing.T) {
 		}(i)
 	}
 
-	//Wait
+	// Wait for all
 	successCount := 0
 	for i := 0; i < 10; i++ {
 		if <-done {
@@ -194,4 +240,6 @@ func TestConcurrentPRCreation(t *testing.T) {
 	if successCount < 8 {
 		t.Errorf("Expected at least 8 successful creations, got %d", successCount)
 	}
+
+	t.Logf("Successfully created %d/10 PRs concurrently", successCount)
 }

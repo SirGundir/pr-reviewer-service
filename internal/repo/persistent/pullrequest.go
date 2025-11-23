@@ -205,18 +205,10 @@ func (r *PullRequestRepo) GetByReviewer(ctx context.Context, userID string) ([]e
 }
 
 func (r *PullRequestRepo) Exists(ctx context.Context, prID string) (bool, error) {
-	sql, args, err := r.Builder.
-		Select("EXISTS(SELECT 1 FROM pull_requests WHERE pull_request_id = ?)").
-		From("pull_requests").
-		Where("pull_request_id = ?", prID).
-		ToSql()
-
-	if err != nil {
-		return false, fmt.Errorf("PullRequestRepo - Exists - r.Builder: %w", err)
-	}
+	query := `SELECT EXISTS(SELECT 1 FROM pull_requests WHERE pull_request_id = $1)`
 
 	var exists bool
-	err = r.Pool.QueryRow(ctx, sql, args...).Scan(&exists)
+	err := r.Pool.QueryRow(ctx, query, prID).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("PullRequestRepo - Exists - r.Pool.QueryRow: %w", err)
 	}

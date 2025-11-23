@@ -1,23 +1,43 @@
 #!/bin/bash
 
+set -e
+
 echo "=== Load Testing PR Reviewer Service ==="
 echo ""
 
-if ! command -v hey &> /dev/null; then
-    echo "Installing hey..."
-    go install github.com/rakyll/hey@latest
-fi
-
 BASE_URL="http://localhost:8080"
 
-#Health check
-echo "1. Health Check Load Test (1000 requests, 50 concurrent)"
-hey -n 1000 -c 50 $BASE_URL/health
+if ! curl -s $BASE_URL/health > /dev/null; then
+    echo "Error: Service is not running on $BASE_URL"
+    echo "Run: make docker-up"
+    exit 1
+fi
+
+echo "Service is running"
 echo ""
 
-#Team creation
-echo "2. Creating test team..."
-curl -s -X POST $BASE_URL/team/add \
+if ! command -v hey &> /dev/null; then
+    echo "Installing hey"
+    go install github.com/rakyll/hey@latest
+    echo "hey installed"
+    echo ""
+fi
+
+HEY_CMD="hey"
+if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
+    GOPATH=$(go env GOPATH)
+    HEY_CMD="$GOPATH/bin/hey.exe"
+fi
+
+# Health check load test
+echo "Health Check Load Test"
+echo "   Requests: 1000, Concurrency: 50"
+echo "   ----------------------------------------"
+$HEY_CMD -n 1000 -c 50 -q 1 $BASE_URL/health | grep -E "Status|Requests/sec|Average|Fastest|Slowest"
+echo ""
+
+echo "Creating test team..."
+TEAM_RESPONSE=$(curl -s -X POST $BASE_URL/team/add \
   -H "Content-Type: application/json" \
   -d '{
     "team_name": "load-test-team",
@@ -26,20 +46,47 @@ curl -s -X POST $BASE_URL/team/add \
       {"user_id": "lt2", "username": "LoadUser2", "is_active": true},
       {"user_id": "lt3", "username": "LoadUser3", "is_active": true}
     ]
-  }' > /dev/null
-echo "Team created"
+  }')
+
+if echo "$TEAM_RESPONSE" | grep -q "team_name"; then
+    echo "Team created successfully"
+else
+    echo "Team might already exist (continuing...)"
+fi
 echo ""
 
-#PR creation
-echo "3. PR Creation Load Test (100 requests, 10 concurrent)"
+# PR Creation Load Test
+echo "PR Creation Load Test"
+echo "   Requests: 100, Concurrency: 10"
+
+TEMP_FILE=$(mktemp)
 for i in {1..100}; do
-  echo "{\"pull_request_id\":\"load-pr-$i\",\"pull_request_name\":\"Load Test PR $i\",\"author_id\":\"lt1\"}"
-done | hey -n 100 -c 10 -m POST -H "Content-Type: application/json" -D /dev/stdin $BASE_URL/pullRequest/create
+  echo "{\"pull_request_id\":\"load-pr-$(date +%s%N)-$i\",\"pull_request_name\":\"Load Test PR $i\",\"author_id\":\"lt1\"}" >> $TEMP_FILE
+done
+
+$HEY_CMD -n 100 -c 10 -m POST \
+  -H "Content-Type: application/json" \
+  -D $TEMP_FILE \
+  $BASE_URL/pullRequest/create | grep -E "Status|Requests/sec|Average|Fastest|Slowest"
+
+rm $TEMP_FILE
 echo ""
 
-#Stats endpoint
-echo "4. Stats Endpoint Load Test (500 requests, 25 concurrent)"
-hey -n 500 -c 25 $BASE_URL/stats/users
+# Stats endpoint load test
+echo "Stats Endpoint Load Test"
+echo "   Requests: 500, Concurrency: 25"
+echo "   ----------------------------------------"
+$HEY_CMD -n 500 -c 25 -q 1 $BASE_URL/stats/users | grep -E "Status|Requests/sec|Average|Fastest|Slowest"
+echo ""
+
+# Get Team Load Test
+echo "Get Team Load Test"
+echo "   Requests: 200, Concurrency: 20"
+echo "   ----------------------------------------"
+$HEY_CMD -n 200 -c 20 "$BASE_URL/team/get?team_name=load-test-team" | grep -E "Status|Requests/sec|Average|Fastest|Slowest"
 echo ""
 
 echo "=== Load Test Complete ==="
+echo ""
+echo "All endpoints tested"
+echo ""
