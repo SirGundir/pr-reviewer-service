@@ -11,6 +11,7 @@ type (
 		GetByID(ctx context.Context, userID string) (entity.User, error)
 		Update(ctx context.Context, user entity.User) error
 		GetByTeam(ctx context.Context, teamName string) ([]entity.User, error)
+		DeactivateTeam(ctx context.Context, teamName string) error
 	}
 
 	TeamRepo interface {
@@ -25,5 +26,8 @@ type (
 		Update(ctx context.Context, pr entity.PullRequest) error
 		GetByReviewer(ctx context.Context, userID string) ([]entity.PullRequest, error)
 		Exists(ctx context.Context, prID string) (bool, error)
+		GetUserStats(ctx context.Context) ([]entity.UserStats, error)
+		GetPRStats(ctx context.Context) (*entity.PRStats, error)
+		GetOpenPRsByTeam(ctx context.Context, teamName string) ([]entity.PullRequest, error)
 	}
 )

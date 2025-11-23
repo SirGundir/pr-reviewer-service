@@ -223,3 +223,88 @@ func (r *PullRequestRepo) Exists(ctx context.Context, prID string) (bool, error)
 
 	return exists, nil
 }
+
+func (r *PullRequestRepo) GetUserStats(ctx context.Context) ([]entity.UserStats, error) {
+	query := `
+		SELECT 
+			u.user_id,
+			u.username,
+			COUNT(pr.pull_request_id) as total_assigned,
+			COUNT(CASE WHEN p.status = 'OPEN' THEN 1 END) as open_assigned,
+			COUNT(CASE WHEN p.status = 'MERGED' THEN 1 END) as merged_assigned
+		FROM users u
+		LEFT JOIN pr_reviewers pr ON u.user_id = pr.reviewer_id
+		LEFT JOIN pull_requests p ON pr.pull_request_id = p.pull_request_id
+		GROUP BY u.user_id, u.username
+		ORDER BY total_assigned DESC
+	`
+
+	rows, err := r.Pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("PullRequestRepo - GetUserStats - r.Pool.Query: %w", err)
+	}
+	defer rows.Close()
+
+	var stats []entity.UserStats
+	for rows.Next() {
+		var stat entity.UserStats
+		if err := rows.Scan(&stat.UserID, &stat.Username, &stat.TotalAssigned, &stat.OpenAssigned, &stat.MergedAssigned); err != nil {
+			return nil, fmt.Errorf("PullRequestRepo - GetUserStats - rows.Scan: %w", err)
+		}
+		stats = append(stats, stat)
+	}
+
+	return stats, nil
+}
+
+func (r *PullRequestRepo) GetPRStats(ctx context.Context) (*entity.PRStats, error) {
+	query := `
+		SELECT 
+			COUNT(*) as total_prs,
+			COUNT(CASE WHEN status = 'OPEN' THEN 1 END) as open_prs,
+			COUNT(CASE WHEN status = 'MERGED' THEN 1 END) as merged_prs,
+			(SELECT COUNT(*) FROM pr_reviewers) as total_reviewers
+		FROM pull_requests
+	`
+
+	var stats entity.PRStats
+	err := r.Pool.QueryRow(ctx, query).Scan(
+		&stats.TotalPRs,
+		&stats.OpenPRs,
+		&stats.MergedPRs,
+		&stats.TotalReviewers,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("PullRequestRepo - GetPRStats - r.Pool.QueryRow: %w", err)
+	}
+
+	return &stats, nil
+}
+
+func (r *PullRequestRepo) GetOpenPRsByTeam(ctx context.Context, teamName string) ([]entity.PullRequest, error) {
+	query := `
+		SELECT DISTINCT p.pull_request_id, p.pull_request_name, p.author_id, p.status, p.created_at, p.merged_at
+		FROM pull_requests p
+		JOIN pr_reviewers pr ON p.pull_request_id = pr.pull_request_id
+		JOIN users u ON pr.reviewer_id = u.user_id
+		WHERE u.team_name = $1 AND p.status = 'OPEN'
+	`
+
+	rows, err := r.Pool.Query(ctx, query, teamName)
+	if err != nil {
+		return nil, fmt.Errorf("PullRequestRepo - GetOpenPRsByTeam: %w", err)
+	}
+	defer rows.Close()
+
+	var prs []entity.PullRequest
+	for rows.Next() {
+		var pr entity.PullRequest
+		if err := rows.Scan(&pr.PullRequestID, &pr.PullRequestName, &pr.AuthorID, &pr.Status, &pr.CreatedAt, &pr.MergedAt); err != nil {
+			return nil, err
+		}
+		prs = append(prs, pr)
+	}
+
+	return prs, nil
+}

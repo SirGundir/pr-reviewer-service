@@ -52,8 +52,11 @@ OpenAPI спецификация находится в openapi.yaml.
 ## Эндпоинты:
 - POST /team/add — создать команду с участниками
 - GET /team/get?team_name=xxx — получить команду
+- POST /team/deactivate - деактивация команды
 - POST /users/setIsActive — изменить активность пользователя
 - GET /users/getReview?user_id=xxx — получить PR’ы пользователя
 - POST /pullRequest/create — создать PR
 - POST /pullRequest/merge — пометить PR как MERGED
 - POST /pullRequest/reassign — переназначить ревьювера
+- GET /stats/prs - статистика по pull requests
+- GET /stats/users - статистика по пользователям

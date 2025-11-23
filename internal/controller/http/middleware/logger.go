@@ -30,7 +30,6 @@ func (rw *responseWriter) WriteHeader(code int) {
 	rw.wroteHeader = true
 }
 
-// Logger middleware логирует HTTP запросы
 func Logger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -49,7 +48,6 @@ func Logger(next http.Handler) http.Handler {
 	})
 }
 
-// Recovery middleware восстанавливает после panic
 func Recovery(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
@@ -63,7 +61,6 @@ func Recovery(next http.Handler) http.Handler {
 	})
 }
 
-// CORS middleware добавляет CORS заголовки
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")

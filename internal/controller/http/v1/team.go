@@ -17,6 +17,7 @@ func newTeamRoutes(mux *http.ServeMux, t *usecase.TeamUseCase) {
 
 	mux.HandleFunc("POST /team/add", r.create)
 	mux.HandleFunc("GET /team/get", r.get)
+	mux.HandleFunc("POST /team/deactivate", r.deactivate)
 }
 
 type createTeamRequest struct {
@@ -26,6 +27,10 @@ type createTeamRequest struct {
 		Username string `json:"username"`
 		IsActive bool   `json:"is_active"`
 	} `json:"members"`
+}
+
+type deactivateTeamRequest struct {
+	TeamName string `json:"team_name"`
 }
 
 func (r *teamRoutes) create(w http.ResponseWriter, req *http.Request) {
@@ -75,4 +80,17 @@ func (r *teamRoutes) get(w http.ResponseWriter, req *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, team)
+}
+
+func (r *teamRoutes) deactivate(w http.ResponseWriter, req *http.Request) {
+	var input deactivateTeamRequest
+	if err := json.NewDecoder(req.Body).Decode(&input); err != nil {
+		respondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"message":   "Team deactivated",
+		"team_name": input.TeamName,
+	})
 }

@@ -117,3 +117,22 @@ func (r *UserRepo) GetByTeam(ctx context.Context, teamName string) ([]entity.Use
 
 	return users, nil
 }
+
+func (r *UserRepo) DeactivateTeam(ctx context.Context, teamName string) error {
+	sql, args, err := r.Builder.
+		Update("users").
+		Set("is_active", false).
+		Where("team_name = ?", teamName).
+		ToSql()
+
+	if err != nil {
+		return fmt.Errorf("UserRepo - DeactivateTeam - r.Builder: %w", err)
+	}
+
+	_, err = r.Pool.Exec(ctx, sql, args...)
+	if err != nil {
+		return fmt.Errorf("UserRepo - DeactivateTeam - r.Pool.Exec: %w", err)
+	}
+
+	return nil
+}

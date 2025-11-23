@@ -22,14 +22,14 @@ func Run(cfg *config.Config) {
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	// --- Postgres ---
+	//Postgres
 	pg, err := postgres.New(cfg.PG.URL, postgres.MaxPoolSize(cfg.PG.PoolMax))
 	if err != nil {
 		log.Fatalf("app - Run - postgres.New: %v", err)
 	}
 	defer pg.Close()
 
-	// --- Repositories & Use Cases ---
+	//Repositories & Use Cases
 	userRepo := persistent.NewUserRepo(pg)
 	teamRepo := persistent.NewTeamRepo(pg, userRepo)
 	prRepo := persistent.NewPullRequestRepo(pg)
@@ -38,12 +38,13 @@ func Run(cfg *config.Config) {
 	teamUC := usecase.NewTeamUseCase(teamRepo, userRepo)
 	userUC := usecase.NewUserUseCase(userRepo, prRepo)
 	prUC := usecase.NewPullRequestUseCase(prRepo, userRepo, reviewerSelector)
+	statsUC := usecase.NewStatsUseCase(prRepo, userRepo)
 
-	// --- HTTP Server ---
+	//HTTP Server
 	mux := http.NewServeMux()
-	v1.NewRouter(mux, teamUC, userUC, prUC)
+	v1.NewRouter(mux, teamUC, userUC, prUC, statsUC)
 
-	// Добавляем middleware: Recovery, Logger, CORS
+	//Middleware: Recovery, Logger, CORS
 	handler := middleware.CORS(middleware.Recovery(middleware.Logger(mux)))
 
 	server := &http.Server{
@@ -51,7 +52,6 @@ func Run(cfg *config.Config) {
 		Handler: handler,
 	}
 
-	// Запуск сервера в отдельной горутине
 	go func() {
 		log.Printf("app starting: listening on port %s, PG=%s", cfg.HTTP.Port, cfg.PG.URL)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -59,7 +59,7 @@ func Run(cfg *config.Config) {
 		}
 	}()
 
-	// --- Graceful shutdown ---
+	//Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
